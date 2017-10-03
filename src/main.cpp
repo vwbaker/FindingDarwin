@@ -18,6 +18,7 @@ Look for "TODO" in this file and write new shaders
 #include "Program.h"
 #include "MatrixStack.h"
 #include "Shape.h"
+#include "CreatureGraph.h"
 //#include "GLTextureWriter.h"
 #include "Texture.h"
 
@@ -27,6 +28,7 @@ Look for "TODO" in this file and write new shaders
 
 const float PI = 3.14159;
 const float DEG_85 = 1.48353;
+const int POPULATION = 1;
 
 using namespace std;
 using namespace glm;
@@ -34,7 +36,7 @@ using namespace glm;
 GLFWwindow *window; // Main application window
 string RESOURCE_DIR = ""; // Where the resources are loaded from
 shared_ptr<Program> prog, prog2; 
-shared_ptr<Shape> shape, cylinder, sphere;
+shared_ptr<Shape> cube;
 
 Texture texture2;
 GLint h_texture2;
@@ -49,6 +51,8 @@ float theta = -PI/2.0, phi = 0;
 double xorig, yorig;
 int firsttime = 1;
 glm::vec3 target(0, 1, -1), eye(0, 1.0, 0);
+
+Creature creatures[POPULATION];
 
 //global reference to texture FBO
 GLuint depthBuf;
@@ -83,24 +87,6 @@ void initQuad() {
 
 }
 
-static void initProg(shared_ptr<Program> *p, string vertShader, string fragShader) {
-	(*p) = make_shared<Program>();
-	(*p)->setVerbose(true);
-	(*p)->setShaderNames(RESOURCE_DIR + vertShader, RESOURCE_DIR + fragShader);
-	(*p)->init();
-	(*p)->addUniform("P");
-	(*p)->addUniform("M");
-	(*p)->addUniform("V");
-/*	(*p)->addUniform("MatAmb");
-	(*p)->addUniform("MatDif");
-	(*p)->addUniform("MatSpec");
-	(*p)->addUniform("shine");
-	(*p)->addAttribute("vertPos");
-	(*p)->addAttribute("vertNor");
-	(*p)->addAttribute("vertTex");
-*/
-}
-
 /* lots of initialization to set up the opengl state and data */
 static void initGL()
 {
@@ -116,8 +102,35 @@ static void initGL()
 	//Initialize the geometry to render a quad to the screen
 	initQuad();
 
+	// Initialize cube
+	cube = make_shared<Shape>();
+	cube->loadMesh(RESOURCE_DIR + "cube.obj");
+	cube->resize();
+	cube->init();
+
+	// Initialize the creature program	
+	prog = make_shared<Program>();
+	prog->setVerbose(true);
+	prog->setShaderNames(RESOURCE_DIR + "simple_vert.glsl", RESOURCE_DIR + "simple_frag.glsl");
+	prog->init();
+	prog->addUniform("P");
+	prog->addUniform("M");
+	prog->addUniform("V");
+	prog->addUniform("MatAmb");
+	prog->addUniform("MatDif");
+	prog->addUniform("MatSpec");
+	prog->addUniform("shine");
+	prog->addAttribute("vertPos");
+	prog->addAttribute("vertNor");
+
 	// Initialize the ground program
-	initProg(&prog2, "tex_vert.glsl", "tex_frag2.glsl");
+	prog2 = make_shared<Program>();
+	prog2->setVerbose(true);
+	prog2->setShaderNames(RESOURCE_DIR + "tex_vert.glsl", RESOURCE_DIR + "tex_frag2.glsl");
+	prog2->init();
+	prog2->addUniform("P");
+	prog2->addUniform("M");
+	prog2->addUniform("V");
 	prog2->addUniform("Texture2");
 	prog2->addTexture(&texture2);
 
@@ -192,6 +205,56 @@ static void initGeom() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
 }
 
+static void initCreatures() {
+	int i;
+	for (i = 0; i < POPULATION; i++) {
+		creatures[i].position = vec3(5, 3, -3);
+
+		Node *cur = creatures[i].root = (Node *) calloc(1, sizeof(Node));
+		cur->dimentions = vec3(2, 1.5, .7);
+		cur->orientation = vec3(PI / 4, PI/4, 0);
+	}
+}
+
+static void drawNode(Node *cur, shared_ptr<MatrixStack> M) {
+	M->rotate(cur->orientation.x, vec3(1, 0, 0));
+	M->rotate(cur->orientation.y, vec3(0, 1, 0));
+	M->rotate(cur->orientation.z, vec3(0, 0, 1));
+	M->scale(cur->dimentions);
+        glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
+	cube->draw(prog);
+}
+
+static void drawCreatures() {
+	int i;
+   	auto M = make_shared<MatrixStack>();
+
+   	auto P = make_shared<MatrixStack>();
+	int width, height;
+	glfwGetFramebufferSize(window, &width, &height);
+   	float aspect = width/(float)height;
+   	P->pushMatrix();
+   	P->perspective(45.0f, aspect, 0.01f, 100.0f);
+
+        glm::vec3 up(0, 1, 0);
+	glm::mat4 V = glm::lookAt(eye, target, up);
+
+	prog->bind();
+	SetMaterial(0);
+        glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
+	glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, value_ptr(V));
+	for (i = 0; i < POPULATION; i++) {
+		M->pushMatrix();
+		M->loadIdentity();
+		M->translate(creatures[i].position);
+		Node *cur = creatures[i].root;
+		drawNode(cur, M);
+		M->popMatrix();
+	}
+	prog->unbind();
+
+}
+
 /* The render loop - this function is called repeatedly during the OGL program run */
 static void render()
 {
@@ -217,6 +280,8 @@ static void render()
    	// Apply perspective projection.
    	P->pushMatrix();
    	P->perspective(45.0f, aspect, 0.01f, 100.0f);
+
+	drawCreatures();
 
         /*draw the ground plane */
         prog2->bind();
@@ -276,12 +341,12 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	}
 	if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 		glm::vec3 view(normalize(target - eye));
-		eye += glm::vec3(view.x * 0.2, 0, view.z * 0.2);
-		target += glm::vec3(view.x * 0.2, 0, view.z * 0.2);
+		eye += glm::vec3(view.x * 0.2, view.y * 0.2, view.z * 0.2);
+		target += glm::vec3(view.x * 0.2, view.y * 0.2, view.z * 0.2);
 	} else if (key == GLFW_KEY_S && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 		glm::vec3 view(normalize(target - eye));
-		eye -= glm::vec3(view.x * 0.2, 0, view.z * 0.2);
-		target -= glm::vec3(view.x * 0.2, 0, view.z * 0.2);
+		eye -= glm::vec3(view.x * 0.2, view.y * 0.2, view.z * 0.2);
+		target -= glm::vec3(view.x * 0.2, view.y * 0.2, view.z * 0.2);
 	} 
 }
 
@@ -410,6 +475,7 @@ int main(int argc, char **argv)
 	// Initialize scene. Note geometry initialized in init now
 	initGL();
 	initGeom();
+	initCreatures();
 
 	// Loop until the user closes the window.
 	while(!glfwWindowShouldClose(window)) {

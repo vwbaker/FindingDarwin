@@ -1,7 +1,6 @@
 #version 330 core 
 in vec3 fragNor;
 in vec3 WPos;
-in vec3 fragTex;
 in vec3 Dlight;
 //to send the color to a frame buffer
 layout(location = 0) out vec4 color;

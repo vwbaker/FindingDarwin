@@ -7,12 +7,6 @@ typedef struct Connection {
 	// Vector from point of rotation to placement on parent
 	vec3 position;
 	
-	// describe orientation through
-	// 	x: radians to twist (about the x axis)
-	// 	y: radians on the x-z plane
-	// 	z: radians on the x-y plane
-	vec3 orientation;
-
 	// See joint-types above
 	int jointType;
 	// radians that represent the max degree from initial state a joint can rotate
@@ -24,10 +18,15 @@ typedef struct Connection {
 
 typedef struct Node {
 	// Dimentions of the block
-	float width;
-	float height;
-	float depth;
+	vec3 dimentions;
 	vec3 scale;
+
+	// describe orientation through
+	// 	x: radians to twist (about the x axis)
+	// 	y: radians on the x-z plane
+	// 	z: radians on the x-y plane
+	vec3 orientation;
+
 
 	// limbs or things connected to this node (out arrows)
 	int numChild;
@@ -42,3 +41,8 @@ typedef struct Node {
 	struct Node *terminalOnly;
 } Node;
 
+typedef struct Creature {
+	Node *root;
+	vec3 position;
+	vec3 velocity;
+} Creature;
