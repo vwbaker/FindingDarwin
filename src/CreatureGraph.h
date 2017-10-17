@@ -1,3 +1,9 @@
+#include "glm/glm.hpp"
+#include "glm/vec4.hpp"
+#include "glm/mat4x4.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
+using namespace glm;
 
 // joint-types
 const float ONE_DEGREE = 0;
@@ -27,6 +33,8 @@ typedef struct Node {
 	// 	z: radians on the x-y plane
 	vec3 orientation;
 
+	// Direction and speed this specific node is moving
+	vec3 velocity;
 
 	// limbs or things connected to this node (out arrows)
 	int numChild;
@@ -46,3 +54,6 @@ typedef struct Creature {
 	vec3 position;
 	vec3 velocity;
 } Creature;
+
+void swimVector(Node *n, glm::mat4 M);
+

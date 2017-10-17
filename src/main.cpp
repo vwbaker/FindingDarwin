@@ -7,6 +7,7 @@ upper right quad on screen is blue-er to show fragment shader effect on texture
 
 Winter 2017 - ZJW (Piddington texture write)
 Look for "TODO" in this file and write new shaders
+*
 */
 
 #include <iostream>
@@ -26,12 +27,12 @@ Look for "TODO" in this file and write new shaders
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+using namespace std;
+using namespace glm;
+
 const float PI = 3.14159;
 const float DEG_85 = 1.48353;
 const int POPULATION = 1;
-
-using namespace std;
-using namespace glm;
 
 GLFWwindow *window; // Main application window
 string RESOURCE_DIR = ""; // Where the resources are loaded from
@@ -211,17 +212,18 @@ static void initCreatures() {
 		creatures[i].position = vec3(5, 3, -3);
 
 		Node *cur = creatures[i].root = (Node *) calloc(1, sizeof(Node));
-		cur->dimentions = vec3(2, 1.5, .7);
-		cur->orientation = vec3(PI / 4, PI/4, 0);
+		cur->dimentions = vec3(.5, .2, .7);
+		cur->orientation = vec3(0, 0, 0);
+		//cur->orientation = vec3(PI/4, 0, 0);
 		cur->numChild = 2;
 		cur->parentJoint = {vec3(0, 0, 0), 0, 0, 0};
 		cur->children = (struct Node *) calloc(sizeof(Node), 2);
-		(cur->children)[0].dimentions = vec3(1, .75, .35);
+		(cur->children)[0].dimentions = vec3(0.5, 0.2, 0.2);
 		(cur->children)[0].orientation = vec3(0, 0, 0);
-		(cur->children)[0].parentJoint = {vec3(1, 1, 1), 0, 0, 0};
-		(cur->children)[1].dimentions = vec3(1, .75, .35);
+		(cur->children)[0].parentJoint = {vec3(1 + 0.5, 0, 0), 0, 0, 0};
+		(cur->children)[1].dimentions = vec3(0.5, 0.2, 0.2);
 		(cur->children)[1].orientation = vec3(0, 0, 0);
-		(cur->children)[1].parentJoint = {vec3(-1, -1, -1), 0, 0, 0};
+		(cur->children)[1].parentJoint = {vec3(-1 - 0.5, 0, 0), 0, 0, 0};
 		
 	}
 }
@@ -233,10 +235,12 @@ static void drawNode(Node *cur, shared_ptr<MatrixStack> M) {
 	M->rotate(cur->orientation.x, vec3(1, 0, 0));
 	M->rotate(cur->orientation.y, vec3(0, 1, 0));
 	M->rotate(cur->orientation.z, vec3(0, 0, 1));
+
 	M->scale(cur->dimentions);
 
         glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
 	cube->draw(prog);
+	swimVector(cur, M->topMatrix());
 
 	for (i = 0; i < cur->numChild; i++) {
 		Node *child = (cur->children + i);
