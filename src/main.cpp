@@ -212,18 +212,20 @@ static void initCreatures() {
 		creatures[i].position = vec3(5, 3, -3);
 
 		Node *cur = creatures[i].root = (Node *) calloc(1, sizeof(Node));
-		cur->dimentions = vec3(.5, .2, .7);
+		cur->dimensions = vec3(.5, .2, .7);
 		cur->orientation = vec3(0, 0, 0);
 		//cur->orientation = vec3(PI/4, 0, 0);
 		cur->numChild = 2;
 		cur->parentJoint = {vec3(0, 0, 0), 0, 0, 0};
 		cur->children = (struct Node *) calloc(sizeof(Node), 2);
-		(cur->children)[0].dimentions = vec3(0.5, 0.2, 0.2);
+		(cur->children)[0].dimensions = vec3(0.2, 0.1, 0.05);
 		(cur->children)[0].orientation = vec3(0, 0, 0);
-		(cur->children)[0].parentJoint = {vec3(1 + 0.5, 0, 0), 0, 0, 0};
-		(cur->children)[1].dimentions = vec3(0.5, 0.2, 0.2);
+		(cur->children)[0].parentJoint = {vec3(0.2 + 0.5, 0, 0), 0, 0, 0};
+		(cur->children)[0].velocity = vec3(0, -1, 0);
+		(cur->children)[1].dimensions = vec3(0.2, 0.1, 0.05);
 		(cur->children)[1].orientation = vec3(0, 0, 0);
-		(cur->children)[1].parentJoint = {vec3(-1 - 0.5, 0, 0), 0, 0, 0};
+		(cur->children)[1].parentJoint = {vec3(-0.2 - 0.5, 0, 0), 0, 0, 0};
+		//(cur->children)[1].velocity = vec3();
 		
 	}
 }
@@ -236,11 +238,12 @@ static void drawNode(Node *cur, shared_ptr<MatrixStack> M) {
 	M->rotate(cur->orientation.y, vec3(0, 1, 0));
 	M->rotate(cur->orientation.z, vec3(0, 0, 1));
 
-	M->scale(cur->dimentions);
-
-        glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
-	cube->draw(prog);
-	swimVector(cur, M->topMatrix());
+	M->pushMatrix();
+		M->scale(cur->dimensions);
+        	glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
+		cube->draw(prog);
+		swimVector(cur, M->topMatrix());
+	M->popMatrix();
 
 	for (i = 0; i < cur->numChild; i++) {
 		Node *child = (cur->children + i);

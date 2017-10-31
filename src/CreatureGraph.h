@@ -23,8 +23,8 @@ typedef struct Connection {
 } Connection;
 
 typedef struct Node {
-	// Dimentions of the block
-	vec3 dimentions;
+	// Dimensions of the block
+	vec3 dimensions;
 	vec3 scale;
 
 	// describe orientation through
