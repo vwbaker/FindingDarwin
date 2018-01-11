@@ -32,9 +32,15 @@ typedef struct Node {
 	// 	y: radians on the x-z plane
 	// 	z: radians on the x-y plane
 	vec3 orientation;
+	vec3 theta;
+	vec3 rotationPoint;
 
 	// Direction and speed this specific node is moving
 	vec3 velocity;
+	// flags whether the node is moving intentionally
+	int moving;
+	// In order to calculate the node's velocity
+	vec3 lastLocation;
 
 	// limbs or things connected to this node (out arrows)
 	int numChild;
@@ -55,5 +61,5 @@ typedef struct Creature {
 	vec3 velocity;
 } Creature;
 
-void swimVector(Node *n, glm::mat4 M);
+vec3 swimVector(Node *n, glm::mat4 M);
 
