@@ -61,5 +61,5 @@ typedef struct Creature {
 	vec3 velocity;
 } Creature;
 
-vec3 swimVector(Node *n, glm::mat4 M);
+vec3 swimVector(Creature creature, Node *n, glm::mat4 M);
 

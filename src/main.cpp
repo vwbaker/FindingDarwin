@@ -47,6 +47,11 @@ int g_height = 512;
 int g_GiboLen = 6;
 int gMat = 0;
 
+float thetaAtMinHeight = 0;
+float thetaAtMaxHeight = 0;
+float minHeight = 10;
+float maxHeight = 0;
+
 float cameraX = 0, cameraY = 0, cameraZ = 0;;
 float theta = -PI/2.0, phi = 0;
 double xorig, yorig;
@@ -206,38 +211,44 @@ static void initGeom() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
 }
 
+static void initLastLocations(vec3 offset, Node *cur) {
+	int i;
+	cur->lastLocation = offset + cur->parentJoint.position;
+	for (i = 0; i < cur->numChild; i++) {
+		initLastLocations(cur->lastLocation, cur->children + i);
+	}
+}
+
 static void initCreatures() {
 	int i;
 	for (i = 0; i < POPULATION; i++) {
 		creatures[i].position = vec3(-1, 3, -5);
+		creatures[i].velocity = vec3(0, 0, 0);
 
 		Node *cur = creatures[i].root = (Node *) calloc(1, sizeof(Node));
 		cur->dimensions = vec3(.5, .2, .7);
 		cur->orientation = vec3(0, 0, 0);
-		//cur->orientation = vec3(PI/4, 0, 0);
 		cur->numChild = 2;
 		cur->parentJoint = {vec3(0, 0, 0), 0, 0, 0};
 		cur->children = (struct Node *) calloc(sizeof(Node), 2);
 		(cur->children)[0].dimensions = vec3(0.2, 0.05, 0.1);
-		(cur->children)[0].orientation = vec3(0, 0, 0);
 		(cur->children)[0].parentJoint = {vec3(0.2 + 0.5, 0, 0), 0, 0, 0};
 		(cur->children)[0].rotationPoint = vec3(1, 0, 0);
-		(cur->children)[0].theta = vec3(0, 0, 0);
-		(cur->children)[0].velocity = vec3(0, -1, 0);
+		(cur->children)[0].theta = vec3(0, 0, -1);
 		(cur->children)[0].moving = 1;
 		(cur->children)[1].dimensions = vec3(0.2, 0.05, 0.1);
-		(cur->children)[1].orientation = vec3(0, 0, 0);
 		(cur->children)[1].parentJoint = {vec3(-0.2 - 0.5, 0, 0), 0, 0, 0};
 		
+		initLastLocations(creatures[i].position, cur);
 	}
 }
 
-static vec3 drawNode(Node *cur, shared_ptr<MatrixStack> M) {
+static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 	int i;
 	vec3 v = vec3(0, 0, 0);
 
-	cur->orientation = vec3(sin(cur->theta.x), sin(cur->theta.y),
-		sin(cur->theta.z));
+	cur->orientation = vec3(cur->theta.x, cur->theta.y,
+		cur->theta.z);
 
 	M->translate((cur->parentJoint).position);
 
@@ -257,19 +268,53 @@ static vec3 drawNode(Node *cur, shared_ptr<MatrixStack> M) {
 		M->scale(cur->dimensions);
         	glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
 		cube->draw(prog);
-		v = swimVector(cur, M->topMatrix());
+		v = swimVector(creature, cur, M->topMatrix());
 		cur->lastLocation = M->topMatrix() * vec4(0, 0, 0, 1);
 	M->popMatrix();
 
 	for (i = 0; i < cur->numChild; i++) {
 		Node *child = (cur->children + i);
 		M->pushMatrix();
-		v = vec3(v + drawNode(child, M));
+		v = vec3(v + drawNode(creature, child, M));
 		M->popMatrix();
 	}
 
 	return v;
 	
+}
+
+static void calculateSwimmingArm(Node *n) {
+	double ctime = glfwGetTime() * 1;
+	int trunc_time = (int) ctime;
+	double percent = ctime - trunc_time;
+
+	if (trunc_time % 4 == 0) {
+		printf("part 1\n");
+		n->theta.x = 0;
+		n->theta.y = 0;
+		n->theta.z = 1 - percent;
+	} else if (trunc_time % 4 == 1) {
+		printf("part 2\n");
+		n->theta.x = percent * PI / 2;
+		n->theta.y = -percent;
+		n->theta.z = 0;
+	} else if (trunc_time % 4 == 2) {
+		printf("part 3\n");
+		n->theta.x = PI / 2;
+		n->theta.y = percent - 1;
+		n->theta.z = 0;
+	} else {
+		printf("part 4\n");
+		n->theta.x = PI / 2 - percent * PI / 2;
+		n->theta.y = 0;
+		n->theta.z = percent;
+	}
+
+/*
+	n->theta.x = 0;
+	n->theta.y = 0;
+	n->theta.z = 1;
+*/
 }
 
 static void drawCreatures() {
@@ -296,16 +341,33 @@ static void drawCreatures() {
 		M->loadIdentity();
 		M->translate(creatures[i].position);
 		Node *cur = creatures[i].root;
-		(cur->children)[0].theta.z += 0.05;
-		v = drawNode(cur, M);
-		printf("velocity for all nodes are: (%f, %f, %f)\n",
-			v.x, v.y, v.z);
+		//(cur->children)[0].theta.z += 0.05;
+		/* if theta.z is getting close to 1, then I want to turn the flipper
+		 * 90 degrees so it will go up without making a difference else if it's
+		 * close to -1, I rotate the flipper back */
+		/*if (abs(sin((cur->children)[0].theta.z) - 1) < 0.1) {
+			(cur->children)[0].theta.x = PI/2;
+		} else if (abs(sin((cur->children)[0].theta.z) + 1) < 0.1) {
+			(cur->children)[0].theta.x = 0;
+		}*/
+		calculateSwimmingArm(cur->children);
+		v = drawNode(creatures[i], cur, M);
+		//printf("velocity for all nodes are: (%f, %f, %f)\n",
+		//	v.x, v.y, v.z);
 		creatures[i].position += vec3(v.x, v.y, v.z);
-		printf("new position is: (%f, %f, %f)\n\n",
-			creatures[i].position.x,
-			creatures[i].position.y,
-			creatures[i].position.z);
+		//printf("new position is: (%f, %f, %f)\n\n",
+		//	creatures[i].position.x,
+		//	creatures[i].position.y,
+		//	creatures[i].position.z);
+		creatures[i].velocity = v;
 		M->popMatrix();
+		if (creatures[i].position.y < minHeight) {
+			minHeight = creatures[i].position.y;
+			thetaAtMinHeight = (cur->children)[0].theta.z;
+		} else if (creatures[i].position.y > maxHeight) {
+			maxHeight = creatures[i].position.y;
+			thetaAtMaxHeight = (cur->children)[0].theta.z;
+		}
 	}
 	prog->unbind();
 
@@ -394,6 +456,10 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			glm::vec3(eye - target))));
 		eye += glm::vec3(right.x * 0.2, 0, right.z * 0.2);
 		target += glm::vec3(right.x * 0.2, 0, right.z * 0.2);
+	}
+	if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+		printf("minheight=%f, maxheight=%f, thetaZatminheight=%f, thetaZatmaxHeight=%f\n",
+			minHeight, maxHeight, thetaAtMinHeight, thetaAtMaxHeight);
 	}
 	if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 		glm::vec3 view(normalize(target - eye));
