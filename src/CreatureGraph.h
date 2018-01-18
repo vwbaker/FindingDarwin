@@ -31,6 +31,10 @@ typedef struct Node {
 	// 	x: radians to twist (about the x axis)
 	// 	y: radians on the x-z plane
 	// 	z: radians on the x-y plane
+	//
+	// 	orientation == orientation at rest
+	// 	theta == orientation relative to its rotation point
+	// 	rotationPoint == its joint (probably where it connects to its parent joint 
 	vec3 orientation;
 	vec3 theta;
 	vec3 rotationPoint;

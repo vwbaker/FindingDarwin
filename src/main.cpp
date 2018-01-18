@@ -20,7 +20,6 @@ Look for "TODO" in this file and write new shaders
 #include "MatrixStack.h"
 #include "Shape.h"
 #include "CreatureGraph.h"
-//#include "GLTextureWriter.h"
 #include "Texture.h"
 
 // value_ptr for glm
@@ -39,6 +38,8 @@ string RESOURCE_DIR = ""; // Where the resources are loaded from
 shared_ptr<Program> prog, prog2; 
 shared_ptr<Shape> cube;
 
+double lastTime = 0;
+
 Texture texture2;
 GLint h_texture2;
 
@@ -46,11 +47,6 @@ int g_width = 512;
 int g_height = 512;
 int g_GiboLen = 6;
 int gMat = 0;
-
-float thetaAtMinHeight = 0;
-float thetaAtMaxHeight = 0;
-float minHeight = 10;
-float maxHeight = 0;
 
 float cameraX = 0, cameraY = 0, cameraZ = 0;;
 float theta = -PI/2.0, phi = 0;
@@ -225,6 +221,8 @@ static void initCreatures() {
 		creatures[i].position = vec3(-1, 3, -5);
 		creatures[i].velocity = vec3(0, 0, 0);
 
+
+		/* Currently setting all values manually */
 		Node *cur = creatures[i].root = (Node *) calloc(1, sizeof(Node));
 		cur->dimensions = vec3(.5, .2, .7);
 		cur->orientation = vec3(0, 0, 0);
@@ -247,23 +245,25 @@ static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 	int i;
 	vec3 v = vec3(0, 0, 0);
 
-	cur->orientation = vec3(cur->theta.x, cur->theta.y,
-		cur->theta.z);
-
 	M->translate((cur->parentJoint).position);
 
+	/* Translate it back from it's rotation point */
 	M->translate(vec3(-cur->rotationPoint.x * cur->dimensions.x,
 		-cur->rotationPoint.y * cur->dimensions.y,
 		-cur->rotationPoint.z * cur->dimensions.z));
 
-	M->rotate(cur->orientation.x, vec3(1, 0, 0));
-	M->rotate(cur->orientation.y, vec3(0, 1, 0));
-	M->rotate(cur->orientation.z, vec3(0, 0, 1));
+	/* Set orientation / rotation */
+	M->rotate(cur->theta.x, vec3(1, 0, 0));
+	M->rotate(cur->theta.y, vec3(0, 1, 0));
+	M->rotate(cur->theta.z, vec3(0, 0, 1));
 
+	/* Translate it to it's rotation point to set the orientation above */
 	M->translate(vec3(cur->rotationPoint.x * cur->dimensions.x,
 		cur->rotationPoint.y * cur->dimensions.y,
 		cur->rotationPoint.z * cur->dimensions.z));
 
+	
+	/* scale and actually draw the creature */
 	M->pushMatrix();
 		M->scale(cur->dimensions);
         	glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
@@ -272,6 +272,7 @@ static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 		cur->lastLocation = M->topMatrix() * vec4(0, 0, 0, 1);
 	M->popMatrix();
 
+	/* draw any children */
 	for (i = 0; i < cur->numChild; i++) {
 		Node *child = (cur->children + i);
 		M->pushMatrix();
@@ -288,28 +289,38 @@ static void calculateSwimmingArm(Node *n) {
 	int trunc_time = (int) ctime;
 	double percent = ctime - trunc_time;
 
+	/* Sets one fin to try and push more water down that it is
+	 * pushing up */
 	if (trunc_time % 4 == 0) {
-		printf("part 1\n");
 		n->theta.x = 0;
 		n->theta.y = 0;
 		n->theta.z = 1 - percent;
 	} else if (trunc_time % 4 == 1) {
-		printf("part 2\n");
 		n->theta.x = percent * PI / 2;
 		n->theta.y = -percent;
 		n->theta.z = 0;
 	} else if (trunc_time % 4 == 2) {
-		printf("part 3\n");
 		n->theta.x = PI / 2;
 		n->theta.y = percent - 1;
 		n->theta.z = 0;
 	} else {
-		printf("part 4\n");
 		n->theta.x = PI / 2 - percent * PI / 2;
 		n->theta.y = 0;
 		n->theta.z = percent;
 	}
 
+	/* Uncomment this to just have one fin alternating
+	 * up and down */
+/*
+	if (trunc_time % 2 == 0) {
+		n->theta.z = 1 - 2 * percent;
+	} else {
+		n->theta.z = -1 + 2 * percent;
+
+	}
+*/
+
+	/* Uncomment this to set the arm to a constant value */
 /*
 	n->theta.x = 0;
 	n->theta.y = 0;
@@ -336,38 +347,29 @@ static void drawCreatures() {
 	SetMaterial(0);
         glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
 	glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, value_ptr(V));
+
+	/* For every creature */
 	for (i = 0; i < POPULATION; i++) {
 		M->pushMatrix();
 		M->loadIdentity();
 		M->translate(creatures[i].position);
 		Node *cur = creatures[i].root;
-		//(cur->children)[0].theta.z += 0.05;
-		/* if theta.z is getting close to 1, then I want to turn the flipper
-		 * 90 degrees so it will go up without making a difference else if it's
-		 * close to -1, I rotate the flipper back */
-		/*if (abs(sin((cur->children)[0].theta.z) - 1) < 0.1) {
-			(cur->children)[0].theta.x = PI/2;
-		} else if (abs(sin((cur->children)[0].theta.z) + 1) < 0.1) {
-			(cur->children)[0].theta.x = 0;
-		}*/
+
+		/* FOR DEBUGGING: a statement to have something print once every second */
+		if (glfwGetTime() > 1 + lastTime) {
+			lastTime = glfwGetTime();
+			printf("position=(%f, %f, %f)\n", creatures[i].position.x,
+				creatures[i].position.y, creatures[i].position.z);
+		}
+
 		calculateSwimmingArm(cur->children);
+
+		/* Draw the creature */
 		v = drawNode(creatures[i], cur, M);
-		//printf("velocity for all nodes are: (%f, %f, %f)\n",
-		//	v.x, v.y, v.z);
+		/* Update fields */
 		creatures[i].position += vec3(v.x, v.y, v.z);
-		//printf("new position is: (%f, %f, %f)\n\n",
-		//	creatures[i].position.x,
-		//	creatures[i].position.y,
-		//	creatures[i].position.z);
 		creatures[i].velocity = v;
 		M->popMatrix();
-		if (creatures[i].position.y < minHeight) {
-			minHeight = creatures[i].position.y;
-			thetaAtMinHeight = (cur->children)[0].theta.z;
-		} else if (creatures[i].position.y > maxHeight) {
-			maxHeight = creatures[i].position.y;
-			thetaAtMaxHeight = (cur->children)[0].theta.z;
-		}
 	}
 	prog->unbind();
 
@@ -456,10 +458,6 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			glm::vec3(eye - target))));
 		eye += glm::vec3(right.x * 0.2, 0, right.z * 0.2);
 		target += glm::vec3(right.x * 0.2, 0, right.z * 0.2);
-	}
-	if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-		printf("minheight=%f, maxheight=%f, thetaZatminheight=%f, thetaZatmaxHeight=%f\n",
-			minHeight, maxHeight, thetaAtMinHeight, thetaAtMaxHeight);
 	}
 	if (key == GLFW_KEY_W && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 		glm::vec3 view(normalize(target - eye));
