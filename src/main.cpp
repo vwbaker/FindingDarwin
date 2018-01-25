@@ -245,6 +245,7 @@ static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 	int i;
 	vec3 v = vec3(0, 0, 0);
 
+	/* translate to its position relative to its parent */
 	M->translate((cur->parentJoint).position);
 
 	/* Translate it back from it's rotation point */
@@ -268,6 +269,8 @@ static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 		M->scale(cur->dimensions);
         	glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
 		cube->draw(prog);
+
+		/* Calculate the resulting velocity of the node */
 		v = swimVector(creature, cur, M->topMatrix());
 		cur->lastLocation = M->topMatrix() * vec4(0, 0, 0, 1);
 	M->popMatrix();
@@ -331,7 +334,7 @@ static void calculateSwimmingArm(Node *n) {
 static void drawCreatures() {
 	int i;
    	auto M = make_shared<MatrixStack>();
-	vec3 v;
+	vec3 v, r;
 
    	auto P = make_shared<MatrixStack>();
 	int width, height;
@@ -357,15 +360,20 @@ static void drawCreatures() {
 
 		/* FOR DEBUGGING: a statement to have something print once every second */
 		if (glfwGetTime() > 1 + lastTime) {
+			printf("Frames: %d, fps: %f\n", frames, frames / glfwGetTime());
 			lastTime = glfwGetTime();
 			printf("position=(%f, %f, %f)\n", creatures[i].position.x,
 				creatures[i].position.y, creatures[i].position.z);
+			printf("Last rotation=(%f, %f, %f)\n\n", r.x, r.y, r.z);
+			slowItDown(5);
 		}
 
 		calculateSwimmingArm(cur->children);
 
 		/* Draw the creature */
 		v = drawNode(creatures[i], cur, M);
+		r = rotationVector(M->topMatrix(), v);
+		creatures[i].root->theta = vec3(creatures[i].root->theta + r);
 		/* Update fields */
 		creatures[i].position += vec3(v.x, v.y, v.z);
 		creatures[i].velocity = v;
