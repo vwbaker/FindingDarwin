@@ -39,6 +39,10 @@ typedef struct Node {
 	vec3 theta;
 	vec3 rotationPoint;
 
+	/* The minimum and maximum thetas are allowed to be */
+	vec3 min_theta;
+	vec3 max_theta;
+
 	// Direction and speed this specific node is moving
 	vec3 velocity;
 	// flags whether the node is moving intentionally
@@ -68,3 +72,5 @@ typedef struct Creature {
 vec3 swimVector(Creature creature, Node *n, glm::mat4 M);
 
 vec3 rotationVector(glm::mat4 M, vec3 velocity);
+
+vec3 optimalDirection(Node *n, vec3 pos, vec3 goal);

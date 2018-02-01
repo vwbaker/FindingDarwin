@@ -36,9 +36,10 @@ const int POPULATION = 1;
 GLFWwindow *window; // Main application window
 string RESOURCE_DIR = ""; // Where the resources are loaded from
 shared_ptr<Program> prog, prog2; 
-shared_ptr<Shape> cube;
+shared_ptr<Shape> cube, sphere;
 
 double lastTime = 0;
+int frames = 0;
 
 Texture texture2;
 GLint h_texture2;
@@ -53,6 +54,7 @@ float theta = -PI/2.0, phi = 0;
 double xorig, yorig;
 int firsttime = 1;
 glm::vec3 target(0, 1, -1), eye(0, 1.0, 0);
+vec3 goal(-1, 5, -5);
 
 Creature creatures[POPULATION];
 
@@ -110,6 +112,11 @@ static void initGL()
 	cube->resize();
 	cube->init();
 
+	sphere = make_shared<Shape>();
+	sphere->loadMesh(RESOURCE_DIR + "sphere.obj");
+	sphere->resize();
+	sphere->init();
+
 	// Initialize the creature program	
 	prog = make_shared<Program>();
 	prog->setVerbose(true);
@@ -123,6 +130,7 @@ static void initGL()
 	prog->addUniform("MatSpec");
 	prog->addUniform("shine");
 	prog->addAttribute("vertPos");
+	prog->addAttribute("vertTex");
 	prog->addAttribute("vertNor");
 
 	// Initialize the ground program
@@ -232,8 +240,9 @@ static void initCreatures() {
 		(cur->children)[0].dimensions = vec3(0.2, 0.05, 0.1);
 		(cur->children)[0].parentJoint = {vec3(0.2 + 0.5, 0, 0), 0, 0, 0};
 		(cur->children)[0].rotationPoint = vec3(1, 0, 0);
-		(cur->children)[0].theta = vec3(0, 0, -1);
-		(cur->children)[0].moving = 1;
+		(cur->children)[0].theta = vec3(0, 0, 0);
+		(cur->children)[0].min_theta = vec3(-PI/2, -PI/4, -PI/4);
+		(cur->children)[0].max_theta = vec3(PI/2, PI/4, PI/4);
 		(cur->children)[1].dimensions = vec3(0.2, 0.05, 0.1);
 		(cur->children)[1].parentJoint = {vec3(-0.2 - 0.5, 0, 0), 0, 0, 0};
 		
@@ -327,7 +336,7 @@ static void calculateSwimmingArm(Node *n) {
 /*
 	n->theta.x = 0;
 	n->theta.y = 0;
-	n->theta.z = 1;
+	n->theta.z = 0;
 */
 }
 
@@ -351,34 +360,47 @@ static void drawCreatures() {
         glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
 	glUniformMatrix4fv(prog->getUniform("V"), 1, GL_FALSE, value_ptr(V));
 
+	frames++;
+
 	/* For every creature */
 	for (i = 0; i < POPULATION; i++) {
 		M->pushMatrix();
 		M->loadIdentity();
 		M->translate(creatures[i].position);
 		Node *cur = creatures[i].root;
+		vec3 best = optimalDirection(creatures[i].root->children,
+			creatures[i].position, goal);
+		cur->children->theta += best;
 
 		/* FOR DEBUGGING: a statement to have something print once every second */
 		if (glfwGetTime() > 1 + lastTime) {
-			printf("Frames: %d, fps: %f\n", frames, frames / glfwGetTime());
+			printf("Frames: %d, average fps: %f\n", frames, frames / glfwGetTime());
 			lastTime = glfwGetTime();
 			printf("position=(%f, %f, %f)\n", creatures[i].position.x,
 				creatures[i].position.y, creatures[i].position.z);
-			printf("Last rotation=(%f, %f, %f)\n\n", r.x, r.y, r.z);
-			slowItDown(5);
+			printf("Last rotation=(%f, %f, %f)\n", r.x, r.y, r.z);
+			printf("best rotation=(%f, %f, %f)\n\n", best.x, best.y, best.z);
 		}
 
-		calculateSwimmingArm(cur->children);
+//		calculateSwimmingArm(cur->children);
 
 		/* Draw the creature */
 		v = drawNode(creatures[i], cur, M);
-		r = rotationVector(M->topMatrix(), v);
-		creatures[i].root->theta = vec3(creatures[i].root->theta + r);
+//		r = rotationVector(M->topMatrix(), v);
+//		creatures[i].root->theta = vec3(creatures[i].root->theta + r);
 		/* Update fields */
 		creatures[i].position += vec3(v.x, v.y, v.z);
 		creatures[i].velocity = v;
 		M->popMatrix();
 	}
+
+	/* draw the goal */
+	M->pushMatrix();
+	M->loadIdentity();
+	M->translate(goal);
+        glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
+	sphere->draw(prog);
+
 	prog->unbind();
 
 }
