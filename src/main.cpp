@@ -53,7 +53,9 @@ float cameraX = 0, cameraY = 0, cameraZ = 0;;
 float theta = -PI/2.0, phi = 0;
 double xorig, yorig;
 int firsttime = 1;
-glm::vec3 target(0, 1, -1), eye(0, 1.0, 0);
+glm::vec3 target(0, 3, -4), eye(0, 3.0, -3);
+
+bool going_up;
 vec3 goal(-1, 5, -5);
 
 Creature creatures[POPULATION];
@@ -368,8 +370,16 @@ static void drawCreatures() {
 		M->loadIdentity();
 		M->translate(creatures[i].position);
 		Node *cur = creatures[i].root;
+
+		if (cur->children->theta.y < -0.75) {
+			going_up = true;
+		} else if (cur->children->theta.y > 0.75) {
+			going_up = false;
+		}
+
+		vec3 force_dir = going_up ? vec3(0, 1, 0) : vec3(0, -1, 0);
 		vec3 best = optimalDirection(creatures[i].root->children,
-			creatures[i].position, goal);
+			creatures[i].position, goal, force_dir);
 		cur->children->theta += best;
 
 		/* FOR DEBUGGING: a statement to have something print once every second */
@@ -379,6 +389,8 @@ static void drawCreatures() {
 			printf("position=(%f, %f, %f)\n", creatures[i].position.x,
 				creatures[i].position.y, creatures[i].position.z);
 			printf("Last rotation=(%f, %f, %f)\n", r.x, r.y, r.z);
+			printf("theta=(%f,%f,%f)\n", cur->children->theta.x, cur->children->theta.y,
+				cur->children->theta.z);
 			printf("best rotation=(%f, %f, %f)\n\n", best.x, best.y, best.z);
 		}
 
@@ -386,8 +398,8 @@ static void drawCreatures() {
 
 		/* Draw the creature */
 		v = drawNode(creatures[i], cur, M);
-//		r = rotationVector(M->topMatrix(), v);
-//		creatures[i].root->theta = vec3(creatures[i].root->theta + r);
+		r = rotationVector(M->topMatrix(), v);
+		creatures[i].root->theta = vec3(creatures[i].root->theta + r);
 		/* Update fields */
 		creatures[i].position += vec3(v.x, v.y, v.z);
 		creatures[i].velocity = v;
@@ -398,8 +410,10 @@ static void drawCreatures() {
 	M->pushMatrix();
 	M->loadIdentity();
 	M->translate(goal);
+	M->scale(vec3(0.1, 0.1, 0.1));
         glUniformMatrix4fv(prog->getUniform("M"), 1, GL_FALSE, value_ptr(M->topMatrix()));
 	sphere->draw(prog);
+	M->popMatrix();
 
 	prog->unbind();
 

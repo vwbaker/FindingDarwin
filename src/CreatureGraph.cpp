@@ -90,7 +90,7 @@ vec3 rotationVector(glm::mat4 M, vec3 velocity) {
 
 /* Given a position and a potential constraint, calculate the best rotation for
  * a fin to move */
-vec3 optimalDirection(Node *n, vec3 pos, vec3 goal) {
+vec3 optimalDirection(Node *n, vec3 pos, vec3 goal, vec3 force_dir) {
 	int rx, ry, rz;
 	vec3 best(0, 0, 0), cur = n->theta;
 	vec3 min_theta = n->min_theta, max_theta = n->max_theta;
@@ -121,6 +121,11 @@ vec3 optimalDirection(Node *n, vec3 pos, vec3 goal) {
 					test.z < min_theta.z || test.z > max_theta.z) {
 					continue;
 				}
+				if ((force_dir.x != 0 && force_dir.x * rx <= 0) ||
+					(force_dir.y != 0 && force_dir.y * ry <= 0) ||
+					(force_dir.z != 0 && force_dir.z * rz <= 0)) {
+					continue;
+				}
 				M.loadIdentity();
 				M.rotate(test.x, vec3(1, 0, 0));
         			M.rotate(test.y, vec3(0, 1, 0));
@@ -133,7 +138,7 @@ vec3 optimalDirection(Node *n, vec3 pos, vec3 goal) {
 				printf("returned swimVector=(%f, %f, %f) ==> progress=%f\n",
 					v.x, v.y, v.z, progress);
 */
-				if (progress > max_progress) {
+				if (progress > max_progress && progress != 0) {
 					best = vec3(rx, ry, rz) * MAX_ROTATION;
 					max_progress = progress;
 				}
