@@ -247,6 +247,10 @@ static void initCreatures() {
 		(cur->children)[0].max_theta = vec3(PI/2, PI/4, PI/4);
 		(cur->children)[1].dimensions = vec3(0.2, 0.05, 0.1);
 		(cur->children)[1].parentJoint = {vec3(-0.2 - 0.5, 0, 0), 0, 0, 0};
+		(cur->children)[1].rotationPoint = vec3(-1, 0, 0);
+		(cur->children)[1].theta = vec3(0, 0, 0);
+		(cur->children)[1].min_theta = vec3(-PI/2, -PI/4, -PI/4);
+		(cur->children)[1].max_theta = vec3(PI/2, PI/4, PI/4);
 		
 		initLastLocations(creatures[i].position, cur);
 	}
@@ -255,6 +259,13 @@ static void initCreatures() {
 static vec3 drawNode(Creature creature, Node *cur, shared_ptr<MatrixStack> M) {
 	int i;
 	vec3 v = vec3(0, 0, 0);
+
+	/* Figure out which direction to move my fin in to swim :) */
+	if (creature.root != cur) {
+		vec3 force_dir = going_up ? vec3(0, 1, 0) : vec3(0, -1, 0);
+		vec3 best = optimalDirection(cur, creature, goal, force_dir);
+		cur->theta += best;
+	}
 
 	/* translate to its position relative to its parent */
 	M->translate((cur->parentJoint).position);
@@ -371,16 +382,12 @@ static void drawCreatures() {
 		M->translate(creatures[i].position);
 		Node *cur = creatures[i].root;
 
+		/* Force y to oscilate */
 		if (cur->children->theta.y < -0.75) {
 			going_up = true;
 		} else if (cur->children->theta.y > 0.75) {
 			going_up = false;
 		}
-
-		vec3 force_dir = going_up ? vec3(0, 1, 0) : vec3(0, -1, 0);
-		vec3 best = optimalDirection(creatures[i].root->children,
-			creatures[i].position, goal, force_dir);
-		cur->children->theta += best;
 
 		/* FOR DEBUGGING: a statement to have something print once every second */
 		if (glfwGetTime() > 1 + lastTime) {
@@ -391,10 +398,7 @@ static void drawCreatures() {
 			printf("Last rotation=(%f, %f, %f)\n", r.x, r.y, r.z);
 			printf("theta=(%f,%f,%f)\n", cur->children->theta.x, cur->children->theta.y,
 				cur->children->theta.z);
-			printf("best rotation=(%f, %f, %f)\n\n", best.x, best.y, best.z);
 		}
-
-//		calculateSwimmingArm(cur->children);
 
 		/* Draw the creature */
 		v = drawNode(creatures[i], cur, M);

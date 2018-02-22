@@ -90,13 +90,13 @@ vec3 rotationVector(glm::mat4 M, vec3 velocity) {
 
 /* Given a position and a potential constraint, calculate the best rotation for
  * a fin to move */
-vec3 optimalDirection(Node *n, vec3 pos, vec3 goal, vec3 force_dir) {
+vec3 optimalDirection(Node *n, Creature creature, vec3 goal, vec3 force_dir) {
 	int rx, ry, rz;
 	vec3 best(0, 0, 0), cur = n->theta;
 	vec3 min_theta = n->min_theta, max_theta = n->max_theta;
 	vec3 rot_point(n->rotationPoint.x * n->dimensions.x, n->rotationPoint.y *
 		n->dimensions.y, n->rotationPoint.z * n->dimensions.z);
-	float max_progress = -500, cur_dist = distance(pos, goal);
+	float max_progress = -500, cur_dist = distance(creature.position, goal);
 	Node temp;
 	Creature c;
 	MatrixStack M;
@@ -127,13 +127,19 @@ vec3 optimalDirection(Node *n, vec3 pos, vec3 goal, vec3 force_dir) {
 					continue;
 				}
 				M.loadIdentity();
+				/* Rotate relative to the creature */
+				M.rotate(creature.root->theta.x, vec3(1, 0, 0));
+				M.rotate(creature.root->theta.y, vec3(0, 1, 0));
+				M.rotate(creature.root->theta.z, vec3(0, 0, 1));
+				M.translate(n->parentJoint.position);
+				/* Rotate relative to the node */
 				M.rotate(test.x, vec3(1, 0, 0));
         			M.rotate(test.y, vec3(0, 1, 0));
         			M.rotate(test.z, vec3(0, 0, 1));
 				M.translate(rot_point);
 
 				vec3 v = swimVector(c, &temp, M.topMatrix());
-				float progress = cur_dist - distance(pos+v, goal);
+				float progress = cur_dist - distance(creature.position+v, goal);
 /*
 				printf("returned swimVector=(%f, %f, %f) ==> progress=%f\n",
 					v.x, v.y, v.z, progress);

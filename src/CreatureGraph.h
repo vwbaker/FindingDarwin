@@ -73,4 +73,4 @@ vec3 swimVector(Creature creature, Node *n, glm::mat4 M);
 
 vec3 rotationVector(glm::mat4 M, vec3 velocity);
 
-vec3 optimalDirection(Node *n, vec3 pos, vec3 goal, vec3 force_dir);
+vec3 optimalDirection(Node *n, Creature creature, vec3 goal, vec3 force_dir);
